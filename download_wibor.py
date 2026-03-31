@@ -1,6 +1,7 @@
 from playwright.sync_api import sync_playwright
 import csv
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import os
 
 TICKERS = {
@@ -88,7 +89,8 @@ def main():
     merge_csv_files(download_dir, "wibor_all.csv")
     
     with open("last_update.txt", "w") as f:
-        f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"))
+    warsaw_time = datetime.now(ZoneInfo("Europe/Warsaw"))
+    f.write(warsaw_time.strftime("%Y-%m-%d %H:%M:%S"))
 
 if __name__ == "__main__":
     main()
