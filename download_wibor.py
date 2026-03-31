@@ -42,11 +42,11 @@ def merge_csv_files(download_dir, output_file):
                 for row in reader:
                     if len(row) >= 5:
                         all_rows.append({
-                            'Date': row[0],
-                            'Open': row[1],
-                            'High': row[2],
-                            'Low': row[3],
-                            'Close': row[4],
+                            'Data': row[0],
+                            'Otwarcie': row[1],
+                            'Najwyższy': row[2],
+                            'Najniższy': row[3],
+                            'Zamknięcie': row[4],
                             'Ticker': name
                         })
             print(f"  {name}: {sum(1 for r in all_rows if r['Ticker'] == name)} wierszy")
@@ -54,7 +54,7 @@ def merge_csv_files(download_dir, output_file):
     all_rows.sort(key=lambda x: (x['Date'], x['Ticker']), reverse=True)
     
     with open(output_file, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=['Date', 'Open', 'High', 'Low', 'Close', 'Ticker'])
+        writer = csv.DictWriter(f, fieldnames=['Data', 'Otwarcie', 'Najwyższy', 'Najniższy', 'Zamknięcie', 'Ticker'])
         writer.writeheader()
         writer.writerows(all_rows)
     
