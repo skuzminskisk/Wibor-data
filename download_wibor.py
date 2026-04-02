@@ -16,18 +16,50 @@ def download_single_ticker(page, ticker, name, download_dir):
     """Pobiera CSV dla jednego tickera"""
     print(f"Pobieram {name} ({ticker})...")
     
-    page.goto(f"https://stooq.pl/q/d/?s={ticker}", wait_until="domcontentloaded", timeout=60000)
-    page.wait_for_timeout(2000)
+    url = f"https://stooq.pl/q/d/?s={ticker}"
+    print(f"  URL: {url}")
+    page.goto(url, wait_until="domcontentloaded", timeout=60000)
+    page.wait_for_timeout(3000)
     
-    # Pobierz plik
-    with page.expect_download(timeout=30000) as download_info:
-        page.click('a:has-text("Pobierz dane")')
+    # Screenshot do debugowania
+    screenshot_path = os.path.join(download_dir, f"{ticker}_screenshot.png")
+    page.screenshot(path=screenshot_path)
+    print(f"  Screenshot: {screenshot_path}")
     
-    download = download_info.value
-    filepath = os.path.join(download_dir, f"{ticker}.csv")
-    download.save_as(filepath)
-    print(f"  Zapisano: {filepath}")
-    return filepath
+    # Sprawdź czy strona się załadowała
+    page_content = page.content()
+    if "Pobierz dane" in page_content:
+        print("  Znaleziono 'Pobierz dane' w HTML")
+    else:
+        print("  NIE znaleziono 'Pobierz dane' w HTML")
+        print(f"  Długość HTML: {len(page_content)} znaków")
+    
+    # Spróbuj różnych selektorów
+    selectors = [
+        'a:has-text("Pobierz dane")',
+        'a[href*="/q/d/l/"]',
+        'text=Pobierz dane w pliku csv',
+        'a:has-text("csv")',
+    ]
+    
+    for selector in selectors:
+        try:
+            element = page.locator(selector)
+            count = element.count()
+            print(f"  Selektor '{selector}': {count} elementów")
+            if count > 0:
+                with page.expect_download(timeout=30000) as download_info:
+                    element.first.click()
+                download = download_info.value
+                filepath = os.path.join(download_dir, f"{ticker}.csv")
+                download.save_as(filepath)
+                print(f"  Zapisano: {filepath}")
+                return filepath
+        except Exception as e:
+            print(f"  Selektor '{selector}' nie zadziałał: {e}")
+            continue
+    
+    raise Exception("Żaden selektor nie zadziałał")
 
 def merge_csv_files(download_dir, output_file):
     """Łączy wszystkie CSV w jeden plik z kolumną Ticker"""
@@ -38,7 +70,7 @@ def merge_csv_files(download_dir, output_file):
         if os.path.exists(filepath):
             with open(filepath, 'r', encoding='utf-8') as f:
                 reader = csv.reader(f)
-                next(reader)  # Pomiń nagłówek
+                next(reader)
                 for row in reader:
                     if len(row) >= 5:
                         all_rows.append({
@@ -51,7 +83,7 @@ def merge_csv_files(download_dir, output_file):
                         })
             print(f"  {name}: {sum(1 for r in all_rows if r['Ticker'] == name)} wierszy")
     
-    all_rows.sort(key=lambda x: (x['Date'], x['Ticker']), reverse=True)
+    all_rows.sort(key=lambda x: (x['Data'], x['Ticker']), reverse=True)
     
     with open(output_file, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=['Data', 'Otwarcie', 'Najwyższy', 'Najniższy', 'Zamknięcie', 'Ticker'])
@@ -73,11 +105,15 @@ def main():
         )
         page = context.new_page()
         
-        # Wejdź na stronę główną (ustaw cookies)
+        # Wejdź na stronę główną
+        print("Wchodzę na stronę główną Stooq...")
         page.goto("https://stooq.pl/", wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(3000)
         
-        # Pobierz dane dla każdego tickera
+        # Screenshot strony głównej
+        page.screenshot(path=os.path.join(download_dir, "main_page.png"))
+        print("Screenshot strony głównej zapisany")
+        
         for ticker, name in TICKERS.items():
             try:
                 download_single_ticker(page, ticker, name, download_dir)
