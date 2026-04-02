@@ -12,54 +12,23 @@ TICKERS = {
     'plbplnon': 'WIBID_ON'
 }
 
-def download_single_ticker(page, ticker, name, download_dir):
-    """Pobiera CSV dla jednego tickera"""
+def download_via_direct_url(page, ticker, name, download_dir):
+    """Pobiera CSV przez bezpośredni URL"""
     print(f"Pobieram {name} ({ticker})...")
     
-    url = f"https://stooq.pl/q/d/?s={ticker}"
-    print(f"  URL: {url}")
-    page.goto(url, wait_until="domcontentloaded", timeout=60000)
-    page.wait_for_timeout(3000)
+    # Bezpośredni URL do CSV
+    csv_url = f"https://stooq.pl/q/d/l/?s={ticker}&i=d"
+    print(f"  URL: {csv_url}")
     
-    # Screenshot do debugowania
-    screenshot_path = os.path.join(download_dir, f"{ticker}_screenshot.png")
-    page.screenshot(path=screenshot_path)
-    print(f"  Screenshot: {screenshot_path}")
+    # Nawiguj do URL - to powinno wywołać download
+    with page.expect_download(timeout=60000) as download_info:
+        page.goto(csv_url)
     
-    # Sprawdź czy strona się załadowała
-    page_content = page.content()
-    if "Pobierz dane" in page_content:
-        print("  Znaleziono 'Pobierz dane' w HTML")
-    else:
-        print("  NIE znaleziono 'Pobierz dane' w HTML")
-        print(f"  Długość HTML: {len(page_content)} znaków")
-    
-    # Spróbuj różnych selektorów
-    selectors = [
-        'a:has-text("Pobierz dane")',
-        'a[href*="/q/d/l/"]',
-        'text=Pobierz dane w pliku csv',
-        'a:has-text("csv")',
-    ]
-    
-    for selector in selectors:
-        try:
-            element = page.locator(selector)
-            count = element.count()
-            print(f"  Selektor '{selector}': {count} elementów")
-            if count > 0:
-                with page.expect_download(timeout=30000) as download_info:
-                    element.first.click()
-                download = download_info.value
-                filepath = os.path.join(download_dir, f"{ticker}.csv")
-                download.save_as(filepath)
-                print(f"  Zapisano: {filepath}")
-                return filepath
-        except Exception as e:
-            print(f"  Selektor '{selector}' nie zadziałał: {e}")
-            continue
-    
-    raise Exception("Żaden selektor nie zadziałał")
+    download = download_info.value
+    filepath = os.path.join(download_dir, f"{ticker}.csv")
+    download.save_as(filepath)
+    print(f"  Zapisano: {filepath}")
+    return filepath
 
 def merge_csv_files(download_dir, output_file):
     """Łączy wszystkie CSV w jeden plik z kolumną Ticker"""
@@ -105,18 +74,15 @@ def main():
         )
         page = context.new_page()
         
-        # Wejdź na stronę główną
+        # Najpierw wejdź na stronę główną (ustaw cookies/sesję)
         print("Wchodzę na stronę główną Stooq...")
         page.goto("https://stooq.pl/", wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(3000)
         
-        # Screenshot strony głównej
-        page.screenshot(path=os.path.join(download_dir, "main_page.png"))
-        print("Screenshot strony głównej zapisany")
-        
+        # Teraz pobierz każdy ticker przez bezpośredni URL
         for ticker, name in TICKERS.items():
             try:
-                download_single_ticker(page, ticker, name, download_dir)
+                download_via_direct_url(page, ticker, name, download_dir)
             except Exception as e:
                 print(f"  Błąd przy {ticker}: {e}")
         
